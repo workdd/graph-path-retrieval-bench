@@ -19,7 +19,7 @@ QUESTION_AWARE = [
         ),
     ),
 ]
-# With the default theta the hub's neighbours are pruned before any cap is
+# With pruning on, the hub's neighbours are pruned before any cap is
 # reached, so the cap test disables pruning.
 HUB_KWARGS = {"pathrag": {"theta": 0.0}}
 

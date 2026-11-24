@@ -26,8 +26,9 @@ Algorithm:
    path nodes excluding the seed, divided by the path length. With several
    seeds the higher score is kept per identical (nodes, rels).
 
-Hyperparameters: ``top_nodes=5`` and ``edge_cost=0.5`` are unverified against
-G-Retriever (arXiv:2402.07630); tuned on validation in Task 12.
+Hyperparameters: ``top_nodes=5`` is fixed. ``edge_cost`` grid {0.25, 0.5, 1.0};
+chosen 0.25 by mean of MetaQA and WebQSP validation hit@10 (see
+docs/tuning.md).
 """
 
 from __future__ import annotations
@@ -48,7 +49,7 @@ class PcstRetriever:
     name = "pcst"
     needs_embedder = True
 
-    def __init__(self, embedder: Embedder, top_nodes: int = 5, edge_cost: float = 0.5) -> None:
+    def __init__(self, embedder: Embedder, top_nodes: int = 5, edge_cost: float = 0.25) -> None:
         self.embedder = embedder
         self.top_nodes = top_nodes
         self.edge_cost = edge_cost

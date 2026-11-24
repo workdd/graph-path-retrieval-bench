@@ -26,8 +26,9 @@ Expansion budget: each node whose neighbours are scanned counts as one
 expansion, over all seeds together; reaching ``max_expanded`` with nodes still
 to expand returns ``capped=True``.
 
-Hyperparameters: defaults ``alpha=0.8`` and ``theta=0.05`` are unverified
-against the paper; tuned on validation in Task 12.
+Hyperparameters: grid ``alpha`` {0.8, 0.9} x ``theta`` {0.0, 0.001, 0.01,
+0.05}; chosen ``alpha=0.9``, ``theta=0.001`` by mean of MetaQA and WebQSP
+validation hit@10 (see docs/tuning.md).
 """
 
 from __future__ import annotations
@@ -42,7 +43,7 @@ class PathRagRetriever:
     name = "pathrag"
     needs_embedder = False
 
-    def __init__(self, alpha: float = 0.8, theta: float = 0.05) -> None:
+    def __init__(self, alpha: float = 0.9, theta: float = 0.001) -> None:
         self.alpha = alpha
         self.theta = theta
 

@@ -15,9 +15,9 @@ path as the relation path.
 Scoring rule: ``score`` is the node's PPR value. Ties are broken by the
 harness.
 
-Hyperparameters: ``damping`` default 0.85 (standard PageRank); HippoRAG value
-to be confirmed from arXiv:2405.14831 and tuned on validation in Task 12.
-``tol`` 1e-8 and ``max_iter`` 100 are convergence settings, not tuned.
+Hyperparameters: ``damping`` grid {0.5, 0.85}, chosen 0.85 by mean of MetaQA
+and WebQSP validation hit@10 (see docs/tuning.md). ``tol`` 1e-8 and
+``max_iter`` 100 are convergence settings, not tuned.
 """
 
 from __future__ import annotations

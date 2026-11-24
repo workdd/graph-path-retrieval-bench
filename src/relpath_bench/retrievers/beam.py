@@ -20,8 +20,8 @@ Expansion budget: each frontier path end node whose neighbours are scanned
 counts as one expansion; reaching ``max_expanded`` with paths still to expand
 returns ``capped=True``.
 
-Hyperparameters: default ``width=3`` is unverified against the paper; tuned on
-validation in Task 12.
+Hyperparameters: grid ``width`` {1, 3, 5}; chosen 5 by mean of MetaQA and
+WebQSP validation hit@10 (see docs/tuning.md).
 """
 
 from __future__ import annotations
@@ -37,7 +37,7 @@ class BeamRetriever:
     name = "beam"
     needs_embedder = True
 
-    def __init__(self, embedder: Embedder, width: int = 3) -> None:
+    def __init__(self, embedder: Embedder, width: int = 5) -> None:
         self.embedder = embedder
         self.width = width
 

@@ -53,8 +53,8 @@ def test_multiple_seeds_keep_best_duplicate(movie_graph):
     assert len(keys) == len(set(keys))
 
 
-def test_default_theta_prunes_hub_neighbours():
+def test_theta_prunes_hub_neighbours():
     g = build_graph([("hub", "r", f"n{i}") for i in range(200)] + [("s", "r", "hub")])
     q = Query("h", "x", (g.node_id("s"),), frozenset())
-    res = registry.make("pathrag").retrieve(g, q, 20, Limits())
+    res = registry.make("pathrag", theta=0.05).retrieve(g, q, 20, Limits())
     assert {g.node_names[p.end] for p in res.paths} == {"hub"}
