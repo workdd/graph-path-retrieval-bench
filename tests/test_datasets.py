@@ -126,7 +126,7 @@ def test_webqsp_download_path(tmp_path, monkeypatch):
         seen.update(repo=repo, **kw)
         return str(snap)
 
-    monkeypatch.setattr(webqsp_mod, "snapshot_download", fake_snapshot)
+    monkeypatch.setattr("huggingface_hub.snapshot_download", fake_snapshot)
     assert len(list(load("webqsp", "test", None))) == 1
     assert seen["repo"] == "rmanluo/RoG-webqsp" and seen["repo_type"] == "dataset"
     assert seen["allow_patterns"] == ["data/test-*"]
@@ -150,3 +150,73 @@ def test_sample_indices_stable():
     assert sample_indices(5, None, 0) == [0, 1, 2, 3, 4]
     s = sample_indices(100, 10, 3)
     assert s == sorted(s) and len(s) == 10
+
+
+def test_metaqa_stats_and_warning(tmp_path):
+    from relpath_bench.datasets.common import LoadStats
+
+    _write_metaqa(
+        tmp_path,
+        {
+            1: (
+                "no brackets here\tHeat\n"  # no entity
+                "who directed [Ghostbusters]\tNobody\n"  # seed, answer missing
+                "who directed [Heat]\tMichael Mann|Nobody\n"  # one answer missing
+            )
+        },
+    )
+    kb = tmp_path / "kb.txt"
+    kb.write_text(kb.read_text() + "\nbroken line\n\n")
+    stats = LoadStats()
+    with pytest.warns(UserWarning, match="dropped"):
+        exs = list(load("metaqa", "test", None, data_dir=tmp_path, stats=stats))
+    assert len(exs) == 2
+    assert stats == LoadStats(
+        kb_lines_malformed=1,
+        question_lines_no_entity=1,
+        seeds_dropped=1,
+        answers_dropped=2,
+        examples_no_seed=1,
+        examples_no_answer=1,
+        examples=2,
+    )
+
+
+def test_clean_load_does_not_warn(tmp_path, recwarn):
+    _write_metaqa(tmp_path, {1: "who directed [Heat]\tMichael Mann\n"})
+    list(load("metaqa", "test", None, data_dir=tmp_path))
+    assert not [w for w in recwarn if "dropped" in str(w.message)]
+
+
+def test_webqsp_stats_and_warning(tmp_path):
+    from relpath_bench.datasets.common import LoadStats
+
+    _write_webqsp(
+        tmp_path,
+        [{"id": "a", "question": "q", "q_entity": ["Al Pacino", "Nobody"],
+          "a_entity": ["Ghost"], "graph": [list(t) for t in MOVIE_TRIPLES]}],
+    )
+    stats = LoadStats()
+    with pytest.warns(UserWarning, match="dropped"):
+        list(load("webqsp", "test", None, data_dir=tmp_path, stats=stats))
+    assert stats == LoadStats(seeds_dropped=1, answers_dropped=1, examples_no_answer=1, examples=1)
+
+
+def test_metaqa_no_hop_files_with_data_dir(tmp_path):
+    (tmp_path / "kb.txt").write_text("a|r|b\n")
+    with pytest.raises(FileNotFoundError, match="qa_test.txt"):
+        list(load("metaqa", "test", None, data_dir=tmp_path))
+
+
+def test_metaqa_error_lists_split_candidates_and_chains(tmp_path, monkeypatch):
+    monkeypatch.setenv("RELPATH_BENCH_DATA", str(tmp_path))
+    boom = OSError("boom")
+
+    def fail(**kw):
+        raise boom
+
+    monkeypatch.setitem(sys.modules, "gdown", types.SimpleNamespace(download_folder=fail))
+    with pytest.raises(FileNotFoundError) as e:
+        list(load("metaqa", "validation", None))
+    assert "qa_dev.txt" in str(e.value) and "qa_valid.txt" in str(e.value)
+    assert e.value.__cause__ is boom

@@ -15,9 +15,8 @@ from collections.abc import Iterator
 from pathlib import Path
 
 import pyarrow.parquet as pq
-from huggingface_hub import snapshot_download
 
-from relpath_bench.datasets.common import Example, data_root, sample_indices
+from relpath_bench.datasets.common import Example, LoadStats, data_root, sample_indices
 from relpath_bench.graph import build_graph
 from relpath_bench.types import Query
 
@@ -29,9 +28,13 @@ def _files(root: Path, split: str) -> list[Path]:
 
 
 def load_webqsp(
-    split: str, sample: int | None, seed: int = 0, data_dir: Path | None = None
+    split: str, sample: int | None, seed: int = 0,
+    data_dir: Path | None = None, stats: LoadStats | None = None,
 ) -> Iterator[Example]:
+    stats = stats if stats is not None else LoadStats()
     if data_dir is None:
+        from huggingface_hub import snapshot_download  # lazy
+
         cache = data_root() / "hf"
         data_dir = Path(
             snapshot_download(
@@ -60,12 +63,15 @@ def load_webqsp(
             while nxt is not None and nxt < pos + len(rows):
                 row = rows[nxt - pos]
                 g = build_graph((h, r, t) for h, r, t in row["graph"])
-                seeds = tuple(
-                    x for x in (g.node_id(n) for n in row["q_entity"] or []) if x is not None
-                )
-                answers = frozenset(
-                    x for x in (g.node_id(n) for n in row["a_entity"] or []) if x is not None
-                )
+                s_ids = [g.node_id(n) for n in row["q_entity"] or []]
+                a_ids = [g.node_id(n) for n in row["a_entity"] or []]
+                seeds = tuple(x for x in s_ids if x is not None)
+                answers = frozenset(x for x in a_ids if x is not None)
+                stats.seeds_dropped += len(s_ids) - len(seeds)
+                stats.answers_dropped += sum(x is None for x in a_ids)
+                stats.examples_no_seed += not seeds
+                stats.examples_no_answer += not answers
+                stats.examples += 1
                 yield Example(
                     Query(str(row["id"]), row["question"], seeds, answers, None), g
                 )

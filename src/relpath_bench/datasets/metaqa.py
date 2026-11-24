@@ -13,7 +13,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 from pathlib import Path
 
-from relpath_bench.datasets.common import Example, data_root, sample_indices
+from relpath_bench.datasets.common import Example, LoadStats, data_root, sample_indices
 from relpath_bench.graph import build_graph
 from relpath_bench.types import Query
 
@@ -31,45 +31,71 @@ def _qa_path(root: Path, hop: int, split: str) -> Path:
     return paths[0]
 
 
+def _candidates(root: Path, hop: int, split: str) -> list[Path]:
+    names = _SPLIT_NAMES.get(split, [split])
+    return [root / f"{hop}-hop" / "vanilla" / f"qa_{n}.txt" for n in names]
+
+
 def _missing(root: Path, split: str) -> list[Path]:
     needed = [root / "kb.txt"] + [_qa_path(root, h, split) for h in HOPS]
     return [p for p in needed if not p.exists()]
 
 
+def _expected(split: str) -> str:
+    names = _SPLIT_NAMES.get(split, [split])
+    qa = " or ".join(f"qa_{n}.txt" for n in names)
+    return "kb.txt, " + ", ".join(f"{h}-hop/vanilla/{qa}" for h in HOPS)
+
+
+def _not_found(root: Path, split: str) -> FileNotFoundError:
+    return FileNotFoundError(
+        f"MetaQA data not found in {root}. Download the folder {FOLDER_URL} "
+        f"into that directory (pip install 'relpath-bench[metaqa]' enables "
+        f"automatic download). Expected files: {_expected(split)}"
+    )
+
+
 def _ensure(root: Path, split: str) -> None:
     if not _missing(root, split):
         return
+    cause: Exception | None = None
     try:
         import gdown  # lazy: only in the `metaqa` extra
 
         root.mkdir(parents=True, exist_ok=True)
         gdown.download_folder(url=FOLDER_URL, output=str(root), quiet=True)
-    except Exception:  # noqa: BLE001 - any failure falls through to the help message
-        pass
+    except Exception as exc:  # noqa: BLE001
+        cause = exc
     if _missing(root, split):
-        wanted = ["kb.txt"] + [f"{h}-hop/vanilla/qa_{split}.txt" for h in HOPS]
-        raise FileNotFoundError(
-            f"MetaQA data not found in {root}. Download the folder {FOLDER_URL} "
-            f"into that directory (pip install 'relpath-bench[metaqa]' enables "
-            f"automatic download). Expected files: {', '.join(wanted)}"
-        )
+        raise _not_found(root, split) from cause
 
 
-def _read_triples(path: Path) -> Iterator[tuple[str, str, str]]:
+def _read_triples(path: Path, stats: LoadStats) -> Iterator[tuple[str, str, str]]:
     with path.open(encoding="utf-8") as f:
         for line in f:
-            parts = line.rstrip("\n").split("|")
+            line = line.rstrip("\n")
+            if not line.strip():
+                continue
+            parts = line.split("|")
             if len(parts) == 3:
                 yield parts[0], parts[1], parts[2]
+            else:
+                stats.kb_lines_malformed += 1
 
 
 def load_metaqa(
-    split: str, sample: int | None, seed: int = 0, data_dir: Path | None = None
+    split: str, sample: int | None, seed: int = 0,
+    data_dir: Path | None = None, stats: LoadStats | None = None,
 ) -> Iterator[Example]:
+    stats = stats if stats is not None else LoadStats()
     root = data_dir if data_dir is not None else data_root() / "metaqa"
     if data_dir is None:
         _ensure(root, split)
-    g = build_graph(_read_triples(root / "kb.txt"))
+    elif not (root / "kb.txt").exists() or all(
+        not _qa_path(root, h, split).exists() for h in HOPS
+    ):
+        raise _not_found(root, split)
+    g = build_graph(_read_triples(root / "kb.txt", stats))
     for hop in HOPS:
         path = _qa_path(root, hop, split)
         if not path.exists():
@@ -78,13 +104,20 @@ def load_metaqa(
         for i in sample_indices(len(lines), sample, seed):
             question, _, ans = lines[i].partition("\t")
             lb, rb = question.find("["), question.find("]")
-            if lb < 0 or rb < lb:
+            if not question.strip():
                 continue
-            seed_name = question[lb + 1 : rb]
-            seeds = tuple(x for x in [g.node_id(seed_name)] if x is not None)
-            answers = frozenset(
-                x for x in (g.node_id(a) for a in ans.split("|")) if x is not None
-            )
+            if lb < 0 or rb < lb:
+                stats.question_lines_no_entity += 1
+                continue
+            seed_id = g.node_id(question[lb + 1 : rb])
+            seeds = (seed_id,) if seed_id is not None else ()
+            ans_ids = [g.node_id(a) for a in ans.split("|") if a]
+            answers = frozenset(x for x in ans_ids if x is not None)
+            stats.seeds_dropped += 1 - len(seeds)
+            stats.answers_dropped += sum(x is None for x in ans_ids)
+            stats.examples_no_seed += not seeds
+            stats.examples_no_answer += not answers
+            stats.examples += 1
             yield Example(
                 Query(
                     qid=f"{hop}hop-{i}",
