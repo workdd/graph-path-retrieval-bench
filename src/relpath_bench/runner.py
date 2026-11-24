@@ -17,6 +17,7 @@ from relpath_bench.metrics import QueryRecord, score_record, summarize
 from relpath_bench.types import Limits
 
 BATCH = 64
+_MP_CONTEXT = None  # tests may inject a fork context
 EMBED_HINT = "pip install relpath-bench[embed]"
 
 
@@ -130,8 +131,12 @@ def run(
                     f.write(_evaluate(r, name, ex, limits) + "\n")
                     f.flush()
 
+    present = sorted(
+        (p.stem for p in d.glob("*.jsonl") if p.stem in registry._REGISTRY),
+        key=registry.names().index,
+    )
     records: list[QueryRecord] = []
-    for name in active:
+    for name in present:
         for line in (d / f"{name}.jsonl").read_text(encoding="utf-8").splitlines():
             records.append(QueryRecord.from_json(line))
     summary = {
@@ -140,7 +145,7 @@ def run(
         "full": sample is None,
         "sample": sample,
         "seed": seed,
-        "algorithms": active,
+        "algorithms": present,
         "load_stats": asdict(stats),
         "rows": summarize(records, by_hops=(dataset == "metaqa")),
     }
@@ -153,6 +158,7 @@ def run(
 def _run_parallel(d, pending, workers, dataset, split, sample, seed, data_dir, embedder, limits):
     with ProcessPoolExecutor(
         max_workers=workers,
+        mp_context=_MP_CONTEXT,
         initializer=_init_worker,
         initargs=(dataset, split, sample, seed, data_dir, embedder, limits),
     ) as pool:
@@ -171,6 +177,9 @@ def _run_parallel(d, pending, workers, dataset, split, sample, seed, data_dir, e
                 for line in fut.result():
                     f.write(line + "\n")
                 f.flush()
+        except BaseException:
+            pool.shutdown(wait=True, cancel_futures=True)
+            raise
         finally:
             for f in files.values():
                 f.close()
