@@ -52,7 +52,15 @@ def test_bfs_tree_hop_limit(movie_graph, pacino_query):
     assert all(len(rels) <= 1 for _, rels in tree.values())
 
 
-def test_registry():
+@pytest.fixture
+def clean_registry():
+    saved = dict(registry._REGISTRY)
+    yield
+    registry._REGISTRY.clear()
+    registry._REGISTRY.update(saved)
+
+
+def test_registry(clean_registry):
     @registry.register
     class Dummy:
         name = "dummy-x"
