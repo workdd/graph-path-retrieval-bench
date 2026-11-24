@@ -150,6 +150,7 @@ def test_webqsp_download_path(tmp_path, monkeypatch):
     assert len(list(load("webqsp", "test", None))) == 1
     assert seen["repo"] == "rmanluo/RoG-webqsp" and seen["repo_type"] == "dataset"
     assert seen["allow_patterns"] == ["data/test-*"]
+    assert seen["revision"] == "c0632533135a06f8c5d536b420deec5fcb5c58f3"
 
 
 def test_unknown_dataset():

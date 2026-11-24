@@ -21,6 +21,7 @@ from relpath_bench.graph import build_graph
 from relpath_bench.types import Query
 
 REPO = "rmanluo/RoG-webqsp"
+REVISION = "c0632533135a06f8c5d536b420deec5fcb5c58f3"
 
 
 def _files(root: Path, split: str) -> list[Path]:
@@ -40,6 +41,7 @@ def load_webqsp(
             snapshot_download(
                 REPO,
                 repo_type="dataset",
+                revision=REVISION,
                 allow_patterns=[f"data/{split}-*"],
                 cache_dir=str(cache),
             )

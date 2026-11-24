@@ -116,3 +116,29 @@ def test_svg_well_formed():
     assert svg.count("<polyline") == 2
     assert svg.count("<circle") == 2 * len(KS)
     assert root.tag.endswith("svg")
+
+
+def test_render_shows_load_stats(tmp_path, full_summary_fixture):
+    path = full_summary_fixture / "webqsp" / "test-full" / "summary.json"
+    d = json.loads(path.read_text())
+    d["load_stats"] = {"answers_dropped": 7113, "examples_no_answer": 71, "examples": 1628}
+    path.write_text(json.dumps(d))
+    readme = _readme(tmp_path)
+    render(full_summary_fixture, readme)
+    text = readme.read_text()
+    assert "answer names dropped (not nodes of the subgraph): 7,113" in text
+    assert "questions with no answer left: 71 of 1,628 (counted as misses in `all`)" in text
+    assert "answers present in the graph" in text
+
+
+def test_render_omits_load_stats_when_clean(tmp_path, full_summary_fixture):
+    readme = _readme(tmp_path)
+    render(full_summary_fixture, readme)
+    assert "answer names dropped" not in readme.read_text()
+
+
+def test_render_shows_metaqa_reachable_ratio_per_hop(tmp_path, full_summary_fixture):
+    readme = _readme(tmp_path)
+    render(full_summary_fixture, readme)
+    text = readme.read_text()
+    assert "reachable_ratio by hops (answer within 3 hops of a seed): 1-hop " in text

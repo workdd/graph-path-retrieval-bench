@@ -33,6 +33,23 @@ def _table(rows: list[dict], order: list[str]) -> str:
     return "\n".join(lines)
 
 
+def _load_notes(stats: dict) -> list[str]:
+    """Generated lines on data dropped while loading; empty when nothing was dropped."""
+    lines = []
+    dropped = stats.get("answers_dropped", 0)
+    if dropped:
+        lines.append(f"- answer names dropped (not nodes of the subgraph): {dropped:,}")
+    no_answer = stats.get("examples_no_answer", 0)
+    if no_answer:
+        lines.append(
+            f"- questions with no answer left: {no_answer:,} of {stats.get('examples', 0):,} "
+            "(counted as misses in `all`)"
+        )
+    if dropped or no_answer:
+        lines.append("- recall is computed over answers present in the graph")
+    return lines
+
+
 def _load_records(run: Path, algorithm: str) -> list[QueryRecord]:
     recs = []
     for line in (run / f"{algorithm}.jsonl").read_text().splitlines():
@@ -124,7 +141,15 @@ def render(out: Path, readme: Path) -> None:
         by_hops = any(r["hops"] != "all" for r in rows)
         parts = [f"### {dataset} ({run.name})"]
         all_rows = [r for r in rows if r["subset"] == "all"]
+        notes = _load_notes(summary.get("load_stats") or {})
         if by_hops:
+            first = [r for r in all_rows if r["algorithm"] == order[0] and "reachable_ratio" in r]
+            if first:
+                ratios = ", ".join(
+                    f"{r['hops']}-hop {100 * r['reachable_ratio']:.2f}%"
+                    for r in sorted(first, key=lambda r: str(r["hops"]))
+                )
+                parts.append(f"reachable_ratio by hops (answer within {Limits().max_hops} hops of a seed): {ratios}")
             parts.append(_table(all_rows, order))
         else:
             ratios = ", ".join(f"{r['algorithm']} {_pct(r['reachable_ratio'])}" for r in sorted(all_rows, key=lambda r: order.index(r["algorithm"])))
@@ -133,6 +158,8 @@ def render(out: Path, readme: Path) -> None:
             reach = [r for r in rows if r["subset"] == "reachable"]
             if reach:
                 parts.append("Subset `reachable`\n\n" + _table(reach, order))
+        if notes:
+            parts.append("\n".join(notes))
         svg = context_recall_svg({a: _load_records(run, a) for a in order})
         figdir.mkdir(parents=True, exist_ok=True)
         (figdir / f"{dataset}_context_recall.svg").write_text(svg)
