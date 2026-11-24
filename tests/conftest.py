@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 
 from data import MOVIE_TRIPLES
@@ -23,3 +25,15 @@ def pacino_query(movie_graph):
         answers=frozenset({g.node_id("Michael Mann"), g.node_id("Martin Scorsese")}),
         hops=2,
     )
+
+
+@pytest.fixture
+def metaqa_fixture_dir(tmp_path_factory) -> Path:
+    root = tmp_path_factory.mktemp("metaqa")
+    (root / "kb.txt").write_text("\n".join(f"{h}|{r}|{t}" for h, r, t in MOVIE_TRIPLES))
+    qa = {2: "who directed the movies starring [Al Pacino]\tMichael Mann|Martin Scorsese\n"}
+    for hop in (1, 2, 3):
+        d = root / f"{hop}-hop" / "vanilla"
+        d.mkdir(parents=True)
+        (d / "qa_test.txt").write_text(qa.get(hop, ""))
+    return root
