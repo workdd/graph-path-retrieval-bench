@@ -5,7 +5,53 @@ A small benchmark that compares relational path retrieval algorithms on knowledg
 ## Results
 
 <!-- RESULTS:START -->
-Results pending: run `relpath-bench run --dataset metaqa --full` and `relpath-bench report`.
+### metaqa (test-full)
+
+| algorithm | hops | hit@1 | hit@10 | recall@10 | context@10 | p50 ms | capped |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| beam | 1 | 40.7% | 52.3% | 51.2% | 14.1 | 68.3 | 8 |
+| beam | 2 | 12.6% | 28.3% | 25.3% | 12.3 | 46.0 | 2 |
+| beam | 3 | 12.1% | 26.1% | 12.2% | 13.9 | 93.5 | 5 |
+| bfs | 1 | 40.3% | 97.8% | 95.8% | 10.0 | 21.6 | 0 |
+| bfs | 2 | 0.0% | 64.3% | 54.5% | 10.0 | 10.8 | 0 |
+| bfs | 3 | 6.2% | 43.6% | 12.6% | 10.0 | 34.5 | 0 |
+| pathrag | 1 | 47.7% | 90.8% | 87.7% | 9.7 | 2.2 | 0 |
+| pathrag | 2 | 0.3% | 81.3% | 65.5% | 9.7 | 2.9 | 0 |
+| pathrag | 3 | 13.6% | 44.6% | 15.8% | 10.0 | 2.3 | 0 |
+| pcst | 1 | 22.9% | 63.1% | 50.2% | 5.2 | 216.3 | 0 |
+| pcst | 2 | 3.3% | 42.8% | 22.5% | 5.2 | 52.4 | 0 |
+| pcst | 3 | 7.6% | 19.3% | 6.4% | 4.0 | 180.9 | 0 |
+| ppr | 1 | 47.2% | 98.1% | 95.4% | 10.7 | 62.8 | 0 |
+| ppr | 2 | 0.7% | 75.8% | 61.9% | 10.2 | 57.2 | 0 |
+| ppr | 3 | 18.5% | 50.8% | 18.1% | 10.7 | 74.9 | 0 |
+
+![metaqa recall versus context](docs/figures/metaqa_context_recall.svg)
+
+### webqsp (test-full)
+
+reachable_ratio (answer within 3 hops of a seed): beam 95.3%, bfs 95.3%, pathrag 95.3%, pcst 95.3%, ppr 95.3%
+
+Subset `all`
+
+| algorithm | hops | hit@1 | hit@10 | recall@10 | context@10 | p50 ms | capped |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| beam | all | 26.7% | 46.5% | 40.1% | 11.3 | 25.0 | 0 |
+| bfs | all | 3.6% | 19.7% | 12.7% | 10.0 | 4.0 | 0 |
+| pathrag | all | 6.3% | 24.1% | 14.9% | 12.2 | 1.6 | 0 |
+| pcst | all | 8.1% | 29.2% | 17.5% | 6.0 | 513.3 | 0 |
+| ppr | all | 8.4% | 33.8% | 22.3% | 12.4 | 6.9 | 0 |
+
+Subset `reachable`
+
+| algorithm | hops | hit@1 | hit@10 | recall@10 | context@10 | p50 ms | capped |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| beam | all | 28.0% | 48.8% | 42.1% | 11.3 | 25.0 | 0 |
+| bfs | all | 3.8% | 20.6% | 13.3% | 10.0 | 4.0 | 0 |
+| pathrag | all | 6.6% | 25.3% | 15.6% | 12.2 | 1.6 | 0 |
+| pcst | all | 8.5% | 30.6% | 18.4% | 6.1 | 513.5 | 0 |
+| ppr | all | 8.8% | 35.4% | 23.4% | 12.4 | 6.9 | 0 |
+
+![webqsp recall versus context](docs/figures/webqsp_context_recall.svg)
 <!-- RESULTS:END -->
 
 ## Install
