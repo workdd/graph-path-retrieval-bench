@@ -6,7 +6,10 @@ from relpath_bench.graph import build_graph
 from relpath_bench.types import Limits, Query
 
 # Shared by every structural retriever (Tasks 5 and 6 add parameters).
-STRUCTURAL = ["bfs", "ppr"]
+STRUCTURAL = ["bfs", "ppr", "pathrag"]
+# With the default theta the hub's neighbours are pruned before any cap is
+# reached, so the cap test disables pruning.
+HUB_KWARGS = {"pathrag": {"theta": 0.0}}
 
 
 @pytest.mark.parametrize("name", STRUCTURAL)
@@ -14,7 +17,9 @@ def test_hub_is_capped(name):
     triples = [("hub", "r", f"n{i}") for i in range(20_000)] + [("s", "r", "hub")]
     g = build_graph(triples)
     q = Query("h", "x", (g.node_id("s"),), frozenset())
-    res = registry.make(name).retrieve(g, q, 20, Limits(max_expanded=1_000))
+    res = registry.make(name, **HUB_KWARGS.get(name, {})).retrieve(
+        g, q, 20, Limits(max_expanded=1_000)
+    )
     assert res.capped is True
 
 
