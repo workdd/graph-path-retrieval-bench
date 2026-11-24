@@ -35,7 +35,7 @@ class ScoredPath:
 
 @dataclass(frozen=True)
 class Limits:
-    max_hops: int = 4
+    max_hops: int = 3
     max_expanded: int = 10_000
 
 

@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections import deque
 
 from relpath_bench.graph import Graph
-from relpath_bench.types import ScoredPath
+from relpath_bench.types import Limits, ScoredPath
 
 BfsTree = dict[int, tuple[tuple[int, ...], tuple[int, ...]]]
 
@@ -63,10 +63,8 @@ def reachable(
     g: Graph,
     seeds: tuple[int, ...],
     answers: frozenset[int],
-    max_hops: int = 4,
+    max_hops: int = Limits().max_hops,
 ) -> bool:
     """True if some answer is reached by a path of length 1..max_hops."""
-    from relpath_bench.types import Limits
-
     tree, _ = bfs_tree(g, seeds, max_hops, Limits().max_expanded)
     return any(a in tree and tree[a][1] for a in answers)

@@ -92,7 +92,7 @@ def score_record(
             for i, r in enumerate(p.rels):
                 triples.add(g.canonical(p.nodes[i], r, p.nodes[i + 1]))
         context[k] = len(triples)
-    ok = bool(q.answers) and reachable(g, q.seeds, q.answers, max_hops=4)
+    ok = bool(q.answers) and reachable(g, q.seeds, q.answers)
     return QueryRecord(
         qid=q.qid,
         algorithm=algorithm,

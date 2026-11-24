@@ -27,7 +27,7 @@ def test_rank_truncates_to_k_by_score():
 def test_scored_path_properties_and_limits():
     p = ScoredPath((1, 2, 3), (0, 1), 1.0)
     assert (p.end, p.length) == (3, 2)
-    assert Limits() == Limits(max_hops=4, max_expanded=10_000)
+    assert Limits() == Limits(max_hops=3, max_expanded=10_000)
     assert RetrievalResult([], False).capped is False
 
 

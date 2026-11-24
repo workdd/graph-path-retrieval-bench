@@ -64,3 +64,18 @@ def test_summarize_rows_and_roundtrip(movie_graph, pacino_query):
 
     rows = summarize([r1, r2], by_hops=True)
     assert {(r["hops"], r["subset"]) for r in rows} == {(2, "all"), (2, "reachable")}
+
+
+def test_reachability_uses_limits_default_three_hops():
+    from relpath_bench.graph import build_graph
+    from relpath_bench.harness import reachable
+    from relpath_bench.types import Limits
+
+    g = build_graph([("a", "r", "b"), ("b", "r", "c"), ("c", "r", "d"), ("d", "r", "e")])
+    seed = (g.node_id("a"),)
+    assert Limits().max_hops == 3
+    assert reachable(g, seed, frozenset({g.node_id("d")})) is True
+    assert reachable(g, seed, frozenset({g.node_id("e")})) is False  # 4 hops away
+    q = Query("q4", "x", seed, frozenset({g.node_id("e")}))
+    rec = score_record(g, q, [], algorithm="t", latency_ms=0.0, capped=False)
+    assert rec.reachable is False

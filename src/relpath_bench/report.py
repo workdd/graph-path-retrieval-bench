@@ -10,6 +10,7 @@ import numpy as np
 
 from relpath_bench import registry
 from relpath_bench.metrics import KS, QueryRecord
+from relpath_bench.types import Limits
 
 START = "<!-- RESULTS:START -->"
 END = "<!-- RESULTS:END -->"
@@ -127,7 +128,7 @@ def render(out: Path, readme: Path) -> None:
             parts.append(_table(all_rows, order))
         else:
             ratios = ", ".join(f"{r['algorithm']} {_pct(r['reachable_ratio'])}" for r in sorted(all_rows, key=lambda r: order.index(r["algorithm"])))
-            parts.append(f"reachable_ratio (answer within 4 hops of a seed): {ratios}")
+            parts.append(f"reachable_ratio (answer within {Limits().max_hops} hops of a seed): {ratios}")
             parts.append("Subset `all`\n\n" + _table(all_rows, order))
             reach = [r for r in rows if r["subset"] == "reachable"]
             if reach:

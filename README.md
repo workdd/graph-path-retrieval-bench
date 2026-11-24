@@ -43,7 +43,7 @@ The PathRAG implementation was written from the paper and does not use code from
 - Budgets are k in {1, 5, 10, 20}; a retriever records its top 20 paths.
 - Ties are broken by the harness: score descending, then path length ascending, then node id tuple.
 - An answer counts only when it is the end node of a path. Zero-length paths are dropped from the ranking.
-- Paths have at most 4 hops.
+- Paths have at most 3 hops.
 - At most 10,000 nodes are expanded per query; hitting the cap is reported in the `capped` column.
 - Hyperparameters are tuned on the validation split only. Defaults and sources are in each retriever's module docstring.
 
