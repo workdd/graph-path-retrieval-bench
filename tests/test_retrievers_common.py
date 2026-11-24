@@ -8,9 +8,9 @@ from relpath_bench.types import Limits, Query
 
 # Shared by every structural retriever (Tasks 5 and 6 add parameters).
 STRUCTURAL = ["bfs", "ppr", "pathrag"]
+QUESTION_AWARE = ["beam"]
 # With the default theta the hub's neighbours are pruned before any cap is
 # reached, so the cap test disables pruning.
-QUESTION_AWARE = ["beam"]
 HUB_KWARGS = {"pathrag": {"theta": 0.0}}
 
 

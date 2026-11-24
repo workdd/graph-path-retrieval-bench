@@ -1,7 +1,13 @@
+import sys
+
 import pytest
 
+import relpath_bench.retrievers  # noqa: F401  (registers retrievers)
+
 from relpath_bench import registry
-from relpath_bench.embed import FixedEmbedder, relation_text
+from relpath_bench.embed import FixedEmbedder, SentenceTransformerEmbedder, relation_text
+from relpath_bench.graph import build_graph
+from relpath_bench.types import Query
 from tables import TABLE
 from relpath_bench.harness import rank
 from relpath_bench.types import Limits
@@ -31,5 +37,40 @@ def test_fixed_embedder_normalises_and_zero():
     assert not np.isnan(m).any()
 
 
-def test_sentence_transformer_import_guard():
-    pytest.importorskip("sentence_transformers")
+def test_sentence_transformer_import_guard(monkeypatch):
+    monkeypatch.setitem(sys.modules, "sentence_transformers", None)
+    with pytest.raises(ImportError):
+        SentenceTransformerEmbedder()
+
+
+def _run(triples, table, seed, width, question="q"):
+    g = build_graph(triples)
+    q = Query("t", question, (g.node_id(seed),), frozenset())
+    res = registry.make("beam", embedder=FixedEmbedder(table), width=width).retrieve(
+        g, q, 20, Limits()
+    )
+    return g, res
+
+
+def test_relation_selection_is_global_not_per_path():
+    triples = [("s", "a", "x"), ("s", "a", "y"), ("x", "good", "z"), ("y", "bad", "w")]
+    table = {"q": [1, 0], "a": [1, 0], "good": [1, 0], "bad": [0, 1]}
+    g, res = _run(triples, table, "s", width=1)
+    ends = {g.node_names[p.end] for p in res.paths if p.length == 2}
+    assert ends == {"z"}
+
+
+def test_paths_are_simple():
+    triples = [("s", "a", "x"), ("x", "b", "z")]
+    table = {"q": [1, 0], "a": [1, 0], "inverse of a": [1, 0], "b": [0, 1]}
+    g, res = _run(triples, table, "s", width=1)
+    assert all(len(set(p.nodes)) == len(p.nodes) for p in res.paths)
+    assert {g.node_names[p.end] for p in res.paths if p.length == 2} == {"z"}
+
+
+def test_score_is_mean_of_relation_similarities():
+    triples = [("s", "a", "x"), ("x", "b", "y")]
+    table = {"q": [1, 1], "a": [1, 0]}
+    g, res = _run(triples, table, "s", width=3)
+    (p,) = [p for p in res.paths if p.length == 2]
+    assert p.score == pytest.approx((0.7071067811865 + 0.0) / 2)
