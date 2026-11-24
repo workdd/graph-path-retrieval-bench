@@ -73,3 +73,26 @@ def test_pcst_respects_max_hops():
 def test_pcst_registers_without_embedder_error_message():
     with pytest.raises(ValueError, match="embedder"):
         registry.make("pcst")
+
+
+def test_pcst_drops_tree_paths_longer_than_max_hops():
+    # every node is within 2 hops of a seed, but the tree joining the two
+    # seeds has a 4-edge path that must not be returned
+    g = build_graph([("s1", "r", "a"), ("a", "r", "b"), ("b", "r", "c"), ("c", "r", "s2")])
+    q = Query("p", "q", (g.node_id("s1"), g.node_id("s2")), frozenset())
+    res = registry.make("pcst", embedder=FixedEmbedder({}), top_nodes=1).retrieve(
+        g, q, 20, Limits(max_hops=2)
+    )
+    assert res.paths
+    assert all(p.length <= 2 for p in res.paths)
+
+
+def test_pcst_seed_prize_keeps_seed_in_tree():
+    # zero similarities, every edge costs 1: without the seed prize the seed
+    # ("z", prize 0) is pruned and no path starts there
+    g = build_graph([("a", "r", "m"), ("m", "r", "z")])
+    q = Query("p", "q", (g.node_id("z"),), frozenset())
+    res = registry.make(
+        "pcst", embedder=FixedEmbedder({}), top_nodes=2, edge_cost=1.0
+    ).retrieve(g, q, 20, Limits())
+    assert {g.node_names[p.end] for p in res.paths} == {"m", "a"}
