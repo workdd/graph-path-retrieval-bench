@@ -6,7 +6,7 @@ from relpath_bench.graph import build_graph
 from relpath_bench.types import Limits, Query
 
 # Shared by every structural retriever (Tasks 5 and 6 add parameters).
-STRUCTURAL = ["bfs"]
+STRUCTURAL = ["bfs", "ppr"]
 
 
 @pytest.mark.parametrize("name", STRUCTURAL)
