@@ -29,5 +29,6 @@ def load(
 
 
 def _run(name, split, sample, seed, data_dir, stats) -> Iterator[Example]:
+    # The drop warning fires only when the stream is fully consumed.
     yield from _LOADERS[name](split, sample, seed, data_dir, stats)
     stats.warn_if_dropped(name)

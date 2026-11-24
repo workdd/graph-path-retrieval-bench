@@ -8,7 +8,6 @@ import pytest
 
 from relpath_bench.datasets import Example, load
 from relpath_bench.datasets import metaqa as metaqa_mod
-from relpath_bench.datasets import webqsp as webqsp_mod
 from relpath_bench.datasets.common import data_root, sample_indices
 from data import MOVIE_TRIPLES
 
@@ -43,7 +42,12 @@ def test_metaqa_parse(tmp_path):
 def test_metaqa_shared_graph_sampling_and_unknown_answer(tmp_path):
     line = "who directed [Heat]\tMichael Mann|Nobody\n"
     _write_metaqa(tmp_path, {1: line * 3, 2: line * 3})
-    exs = list(load("metaqa", "test", 2, seed=0, data_dir=tmp_path))
+    from relpath_bench.datasets.common import LoadStats
+
+    stats = LoadStats()
+    with pytest.warns(UserWarning, match="dropped"):
+        exs = list(load("metaqa", "test", 2, seed=0, data_dir=tmp_path, stats=stats))
+    assert stats.answers_dropped == 4 and stats.examples == 4
     assert len(exs) == 4  # 2 per hop, hop 3 empty
     assert len({id(e.graph) for e in exs}) == 1
     assert [e.query.hops for e in exs] == [1, 1, 2, 2]
@@ -92,7 +96,12 @@ def test_webqsp_missing_entity_dropped(tmp_path):
             }
         ],
     )
-    [ex] = list(load("webqsp", "test", None, data_dir=tmp_path))
+    from relpath_bench.datasets.common import LoadStats
+
+    stats = LoadStats()
+    with pytest.warns(UserWarning, match="dropped"):
+        [ex] = list(load("webqsp", "test", None, data_dir=tmp_path, stats=stats))
+    assert stats.seeds_dropped == 1 and stats.answers_dropped == 1
     assert len(ex.query.seeds) == 1 and ex.query.answers == frozenset()
     assert ex.query.qid == "WebQTest-0" and ex.query.hops is None
 
@@ -117,7 +126,7 @@ def test_webqsp_download_path(tmp_path, monkeypatch):
     snap = tmp_path / "snap"
     _write_webqsp(
         snap,
-        [{"id": "x", "question": "q", "q_entity": ["Heat"], "a_entity": [],
+        [{"id": "x", "question": "q", "q_entity": ["Heat"], "a_entity": ["Michael Mann"],
           "graph": [list(t) for t in MOVIE_TRIPLES]}],
     )
     seen = {}
