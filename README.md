@@ -54,7 +54,7 @@ The PathRAG implementation was written from the paper and does not use code from
 | MetaQA | [yuyuz/MetaQA](https://github.com/yuyuz/MetaQA) | Creative Commons, per its README |
 | WebQSP | Hugging Face `rmanluo/RoG-webqsp` | The dataset card states no license |
 
-Both are downloaded on demand and are not redistributed here.
+Both are downloaded on demand and are not redistributed here. If the MetaQA Google Drive folder cannot be fetched (it answers HTTP 401 to anonymous listing), the loader falls back to the Hugging Face mirror `camazlucas/MetaQA`, which carries the same vanilla files (`kb/kb.txt` instead of `kb.txt`).
 
 ## Adding an algorithm
 

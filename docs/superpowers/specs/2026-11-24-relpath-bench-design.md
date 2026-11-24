@@ -79,11 +79,21 @@ ScoredPath       nodes, relations, score
 
 | 데이터셋 | 형태 | 원본 | 비고 |
 |---|---|---|---|
-| **MetaQA** (1순위) | 영화 KG 하나 + 1, 2, 3홉 질문 | `yuyuz/MetaQA` (Google Drive, Creative Commons) | 홉 수별로 성능이 어떻게 떨어지는지 본다 |
+| **MetaQA** (1순위) | 영화 KG 하나 + 1, 2, 3홉 질문 | `yuyuz/MetaQA` (Google Drive, Creative Commons). Drive 폴더가 익명 접근에서 401을 돌려주면 HF 미러 `camazlucas/MetaQA`로 대체한다 | 홉 수별로 성능이 어떻게 떨어지는지 본다 |
 | **WebQSP** (2순위) | 질문마다 Freebase 부분 그래프 | HF `rmanluo/RoG-webqsp` (test 1,628문항, `q_entity`, `a_entity`, `graph` 필드) | 데이터 카드에 라이선스 표기 없음. README에 원본 출처와 함께 밝힌다 |
 
 - 데이터는 레포에 넣지 않는다. 다운로드 스크립트가 `~/.cache/relpath-bench`에 받는다
-- MetaQA KG 크기와 정확한 파일 구성은 다운로드 후 확인한다 (미검증)
+- MetaQA 실측 (2026-11-24, 로더로 직접 확인)
+  - 받은 곳: Drive 폴더는 401로 받을 수 없어 HF 미러 `camazlucas/MetaQA`를 썼다. 원본 릴리스와 같은 파일 배치이고 KB 위치만 `kb/kb.txt`다
+  - 원본과 같은 파일인지: `kb.txt`는 독립된 GitHub 사본과 SHA-256이 같다 (앞 8자리 `9b4d3b30`). 질문 파일 줄 수는 원본 README 표와 같다. 질문 파일의 바이트 단위 대조는 못 했다
+  - KB: 134,741줄, 중복 제거 후 트리플 133,582개 (자기 루프 11개 포함), 노드 43,234개, 관계 9종 (역방향까지 18종)
+  - 질문 수 (train, dev, test): 1홉 96,106, 9,992, 9,947 / 2홉 118,980, 14,872, 14,872 / 3홉 114,196, 14,274, 14,274
+  - 로더 손실: test, dev, train 모두 시작점 누락 0, 정답 누락 0, 형식 불량 줄 0
+- WebQSP 실측 (2026-11-24, 로더로 직접 확인)
+  - 행 수: test 1,628 (parquet 2개), validation 246 (parquet 1개). 열은 `id, question, answer, q_entity, a_entity, graph, choices`이고 로더가 읽는 이름과 일치한다
+  - 문항별 그래프: 트리플 평균 4,309개, 중앙값 4,415개, 최대 10,810개 (test). 노드는 평균 1,389개
+  - 로더 손실 (test): 정답 이름 16,602개 중 7,113개가 그래프에 없어 빠지고, 정답이 하나도 없는 문항이 71개다. 시작점 누락은 0이다
+  - 로더 손실 (validation): 정답 이름 2,995개 중 1,604개 누락, 정답 없는 문항 11개, 시작점 없는 문항 1개
 
 ### 5.4 평가
 
