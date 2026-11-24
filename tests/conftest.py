@@ -1,20 +1,7 @@
 import pytest
 
+from data import MOVIE_TRIPLES
 from relpath_bench.graph import build_graph
-
-MOVIE_TRIPLES = [
-    ("Heat", "directed_by", "Michael Mann"),
-    ("Heat", "starred_actors", "Al Pacino"),
-    ("Heat", "starred_actors", "Robert De Niro"),
-    ("Heat", "release_year", "1995"),
-    ("The Irishman", "starred_actors", "Al Pacino"),
-    ("The Irishman", "directed_by", "Martin Scorsese"),
-    ("Collateral", "directed_by", "Michael Mann"),
-    ("Collateral", "release_year", "2004"),
-]
-# Question: "who directed the movies starring Al Pacino"
-# Start Al Pacino, answers {Michael Mann, Martin Scorsese}
-# (2 hops: inverse of starred_actors -> directed_by)
 
 
 @pytest.fixture
@@ -23,15 +10,16 @@ def movie_graph():
 
 
 @pytest.fixture
-def pacino_query():
+def pacino_query(movie_graph):
     try:
         from relpath_bench.types import Query
     except ImportError:
         pytest.skip("Query type is introduced in a later task")
+    g = movie_graph
     return Query(
         qid="q1",
-        text="who directed the movies starring Al Pacino",
-        start_entities=["Al Pacino"],
-        answers=["Michael Mann", "Martin Scorsese"],
+        question="who directed the movies starring Al Pacino",
+        seeds=(g.node_id("Al Pacino"),),
+        answers=frozenset({g.node_id("Michael Mann"), g.node_id("Martin Scorsese")}),
         hops=2,
     )

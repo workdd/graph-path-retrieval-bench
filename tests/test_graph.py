@@ -1,4 +1,4 @@
-from conftest import MOVIE_TRIPLES
+from data import MOVIE_TRIPLES
 from relpath_bench.graph import build_graph
 
 

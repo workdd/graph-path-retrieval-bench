@@ -24,4 +24,3 @@ packages = ["src/relpath_bench"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["tests"]
