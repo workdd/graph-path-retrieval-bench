@@ -27,3 +27,5 @@ Questions: MetaQA 900, WebQSP 246. Wall time 568 s.
 | pcst | edge_cost=1.0 | 0.3333 | 0.2317 | 0.2825 |  |
 
 Command: `.venv/bin/python scripts/tune.py --workers 5` (9.5 min, 8 cores, 16 GB, MiniLM embedder `all-MiniLM-L6-v2`).
+
+Note: two choices sit on the grid boundary (beam `width=5` is the largest value tried, pcst `edge_cost=0.25` the smallest), so their optima may lie outside the grid. Grid sizes differ per algorithm (bfs 1, ppr 2, beam 3, pcst 3, pathrag 8), so tuning effort is unequal.

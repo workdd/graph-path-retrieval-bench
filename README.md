@@ -7,6 +7,8 @@ A small benchmark that compares relational path retrieval algorithms on knowledg
 <!-- RESULTS:START -->
 ### metaqa (test-full)
 
+reachable_ratio by hops (answer within 3 hops of a seed): 1-hop 99.98%, 2-hop 100.00%, 3-hop 100.00%
+
 | algorithm | hops | hit@1 | hit@10 | recall@10 | context@10 | p50 ms | capped |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | beam | 1 | 40.7% | 52.3% | 51.2% | 14.1 | 68.3 | 8 |
@@ -51,13 +53,17 @@ Subset `reachable`
 | pcst | all | 8.5% | 30.6% | 18.4% | 6.1 | 513.5 | 0 |
 | ppr | all | 8.8% | 35.4% | 23.4% | 12.4 | 6.9 | 0 |
 
+- answer names dropped (not nodes of the subgraph): 7,113
+- questions with no answer left: 71 of 1,628 (counted as misses in `all`)
+- recall is computed over answers present in the graph
+
 ![webqsp recall versus context](docs/figures/webqsp_context_recall.svg)
 <!-- RESULTS:END -->
 
 ## Install
 
 ```bash
-pip install -e .[embed,metaqa]
+pip install -e '.[embed,metaqa]'  # run from a clone of this repository; not on PyPI
 ```
 
 ## Quickstart
@@ -66,6 +72,7 @@ pip install -e .[embed,metaqa]
 relpath-bench list                                   # registered algorithms
 relpath-bench run --dataset metaqa                   # 1,000-question sample per hop count, seed 0
 relpath-bench run --dataset metaqa --full            # every question
+relpath-bench run --dataset webqsp --full            # every question; add --workers 4 to parallelise
 relpath-bench report --out results --readme README.md
 ```
 
@@ -73,13 +80,15 @@ The README tables are built from `--full` runs only. Sample runs are for quick c
 
 ## Algorithms
 
-| Name | Paper | Differences from the paper |
-| --- | --- | --- |
-| bfs | none (baseline) | Breadth-first search; every reached node yields its shortest path. |
-| ppr | HippoRAG, [arXiv:2405.14831](https://arxiv.org/abs/2405.14831) | Personalized PageRank only; nodes inside the hop limit become paths along their BFS-tree path. |
-| pathrag | PathRAG, [arXiv:2502.14902](https://arxiv.org/abs/2502.14902) | Single-seed adaptation: flow starts at each query seed and every node holding resource yields its propagation-tree path. |
-| beam | Think-on-Graph, [arXiv:2307.07697](https://arxiv.org/abs/2307.07697) | Relation selection uses embedding similarity between question and relation name instead of an LLM. |
-| pcst | G-Retriever, [arXiv:2402.07630](https://arxiv.org/abs/2402.07630) | Retrieval step only, no GNN and no LLM; prizes sit on edges (approximation). |
+| Name | Paper | Reads question | Differences from the paper |
+| --- | --- | --- | --- |
+| bfs | none (baseline) | no | Breadth-first search; every reached node yields its shortest path. |
+| ppr | HippoRAG, [arXiv:2405.14831](https://arxiv.org/abs/2405.14831) | no | Personalized PageRank only; nodes inside the hop limit become paths along their BFS-tree path. |
+| pathrag | PathRAG, [arXiv:2502.14902](https://arxiv.org/abs/2502.14902) | no | One flow per query seed instead of paths between retrieved node pairs; every node holding resource yields its propagation-tree path. No keyword-based node retrieval, and the question is ignored. |
+| beam | Think-on-Graph, [arXiv:2307.07697](https://arxiv.org/abs/2307.07697) | yes | Relation selection uses embedding similarity between question and relation name instead of an LLM. The top `width` relations are kept per hop and every edge with a kept relation is followed, so there is no entity pruning (the frontier is bounded by relation count, not by `width`) and no LLM stopping rule. |
+| pcst | G-Retriever, [arXiv:2402.07630](https://arxiv.org/abs/2402.07630) | yes | Retrieval step only, no GNN and no LLM. Prizes sit on nodes (the most question-similar nodes); relation similarity only lowers edge cost, which approximates the paper's edge prizes. Seeds get a forced prize, which the paper does not have. The subgraph is the 3-hop BFS ball around the seeds, not the full dataset subgraph. |
+
+The question-aware methods (beam, pcst) embed text with `sentence-transformers/all-MiniLM-L6-v2`; their numbers depend on that model. The question-blind methods (bfs, ppr, pathrag) return the same paths for any question with the same seeds, which is a likely reason beam leads on WebQSP (not isolated by an ablation). Tuning settings and results are in [docs/tuning.md](docs/tuning.md).
 
 The PathRAG implementation was written from the paper and does not use code from the original repository.
 
@@ -87,11 +96,16 @@ The PathRAG implementation was written from the paper and does not use code from
 
 - Every algorithm starts from the same seeds, the topic entities given by the dataset.
 - Budgets are k in {1, 5, 10, 20}; a retriever records its top 20 paths.
-- Ties are broken by the harness: score descending, then path length ascending, then node id tuple.
+- Ties are broken by the harness: score descending, then path length ascending, then node id tuple (sorted node names, so the last tie-break is alphabetical).
 - An answer counts only when it is the end node of a path. Zero-length paths are dropped from the ranking.
 - Paths have at most 3 hops.
-- At most 10,000 nodes are expanded per query; hitting the cap is reported in the `capped` column.
+- At most 10,000 node scans per query (beam counts one per frontier path); hitting the cap is reported in the `capped` column.
+- Recall is computed over the answers that are nodes of the graph. WebQSP answer names missing from the subgraph are dropped; the counts are listed under the WebQSP results.
 - Hyperparameters are tuned on the validation split only. Defaults and sources are in each retriever's module docstring.
+
+## Measurement conditions
+
+Latencies (`p50 ms`) were measured on an Apple Silicon laptop (Apple M2, 8 CPU cores) with 4 to 6 worker processes (`--workers`; the MetaQA run was resumed with 4 after a failure at 6, the WebQSP run used 4). Each worker keeps its own embedding cache, so beam and pcst latency excludes repeated embedding of the same text and depends on the order in which questions reach a worker. Absolute values vary with hardware; compare them across algorithms within one table.
 
 ## Datasets
 
@@ -100,7 +114,7 @@ The PathRAG implementation was written from the paper and does not use code from
 | MetaQA | [yuyuz/MetaQA](https://github.com/yuyuz/MetaQA) | Creative Commons, per its README |
 | WebQSP | Hugging Face `rmanluo/RoG-webqsp` | The dataset card states no license |
 
-Both are downloaded on demand and are not redistributed here. The original MetaQA Google Drive folder returned HTTP 401 on 2026-11-24, so the loader falls back to the Hugging Face dataset `camazlucas/MetaQA` pinned at revision `f83854092893610686ab19f2038c039afa9bc643` (it ships `kb/kb.txt` instead of `kb.txt`). Its `kb.txt` has the same SHA-256 (`9b4d3b3066266075ad1577b4beed68e6e112e76e1a29ed2cb00a2896d2b792af`) as the `kb.txt` in the independent copy [brandenkang/MetaQA_PBG](https://github.com/brandenkang/MetaQA_PBG). The question files were checked by line count against the original README table only; they were not byte-compared with the original.
+The WebQSP download is pinned at revision `c0632533135a06f8c5d536b420deec5fcb5c58f3`. Both are downloaded on demand and are not redistributed here. The original MetaQA Google Drive folder returned HTTP 401 on 2026-11-24, so the loader falls back to the Hugging Face dataset `camazlucas/MetaQA` pinned at revision `f83854092893610686ab19f2038c039afa9bc643` (it ships `kb/kb.txt` instead of `kb.txt`). Its `kb.txt` has the same SHA-256 (`9b4d3b3066266075ad1577b4beed68e6e112e76e1a29ed2cb00a2896d2b792af`) as the `kb.txt` in the independent copy [brandenkang/MetaQA_PBG](https://github.com/brandenkang/MetaQA_PBG). The question files were checked by line count against the original README table only; they were not byte-compared with the original.
 
 ## Adding an algorithm
 
