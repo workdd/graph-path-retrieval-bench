@@ -66,6 +66,15 @@ Subset `reachable`
 pip install -e '.[embed,metaqa]'  # run from a clone of this repository; not on PyPI
 ```
 
+On Linux, build `pcst_fast` from source before installing. The prebuilt manylinux wheel of `pcst_fast` 1.0.10 returns wrong trees under numpy 2.x (the same version built from source is correct), and `pip install -e` keeps an already installed copy:
+
+```bash
+pip install --no-binary pcst_fast pcst_fast
+pip install -e '.[embed,metaqa]'
+```
+
+If the installed binary is broken, the `pcst` retriever stops with a `RuntimeError` on first use; fix it with `pip install --force-reinstall --no-binary pcst_fast pcst_fast`.
+
 ## Quickstart
 
 ```bash
@@ -84,7 +93,7 @@ The README tables are built from `--full` runs only. Sample runs are for quick c
 | --- | --- | --- | --- |
 | bfs | none (baseline) | no | Breadth-first search; every reached node yields its shortest path. |
 | ppr | HippoRAG, [arXiv:2405.14831](https://arxiv.org/abs/2405.14831) | no | Personalized PageRank only; nodes inside the hop limit become paths along their BFS-tree path. |
-| pathrag | PathRAG, [arXiv:2502.14902](https://arxiv.org/abs/2502.14902) | no | One flow per query seed instead of paths between retrieved node pairs; every node holding resource yields its propagation-tree path. No keyword-based node retrieval, and the question is ignored. |
+| pathrag | PathRAG, [arXiv:2502.14902](https://arxiv.org/abs/2502.14902) | no | One flow per query seed instead of paths between retrieved node pairs; every node with resource at or above theta yields its propagation-tree path. No keyword-based node retrieval, and the question is ignored. |
 | beam | Think-on-Graph, [arXiv:2307.07697](https://arxiv.org/abs/2307.07697) | yes | Relation selection uses embedding similarity between question and relation name instead of an LLM. The top `width` relations are kept per hop and every edge with a kept relation is followed, so there is no entity pruning (the frontier is bounded by relation count, not by `width`) and no LLM stopping rule. |
 | pcst | G-Retriever, [arXiv:2402.07630](https://arxiv.org/abs/2402.07630) | yes | Retrieval step only, no GNN and no LLM. Prizes sit on nodes (the most question-similar nodes); relation similarity only lowers edge cost, which approximates the paper's edge prizes. Seeds get a forced prize, which the paper does not have. The subgraph is the 3-hop BFS ball around the seeds, not the full dataset subgraph. |
 
@@ -105,7 +114,7 @@ The PathRAG implementation was written from the paper and does not use code from
 
 ## Measurement conditions
 
-Latencies (`p50 ms`) were measured on an Apple Silicon laptop (Apple M2, 8 CPU cores) with 4 to 6 worker processes (`--workers`; the MetaQA run was resumed with 4 after a failure at 6, the WebQSP run used 4). Each worker keeps its own embedding cache, so beam and pcst latency excludes repeated embedding of the same text and depends on the order in which questions reach a worker. Absolute values vary with hardware; compare them across algorithms within one table.
+Latencies (`p50 ms`) were measured on an Apple Silicon laptop (Apple M2, 8 CPU cores) with 4 to 6 worker processes (`--workers`). Each worker keeps its own embedding cache, so beam and pcst latency excludes repeated embedding of the same text and depends on the order in which questions reach a worker. Absolute values vary with hardware; compare them across algorithms within one table.
 
 ## Datasets
 
