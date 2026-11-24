@@ -46,8 +46,21 @@ class SentenceTransformerEmbedder:
     def __init__(self, model: str = "sentence-transformers/all-MiniLM-L6-v2") -> None:
         from sentence_transformers import SentenceTransformer
 
+        self._name = model
         self._model = SentenceTransformer(model)
         self._cache: dict[str, np.ndarray] = {}
+
+    def __getstate__(self) -> dict:
+        # The torch model cannot be pickled to spawned workers; each worker
+        # reloads it from the model name and starts with an empty cache.
+        return {"_name": self._name}
+
+    def __setstate__(self, state: dict) -> None:
+        from sentence_transformers import SentenceTransformer
+
+        self._name = state["_name"]
+        self._model = SentenceTransformer(self._name)
+        self._cache = {}
 
     def encode(self, texts: list[str]) -> np.ndarray:
         missing = [t for t in dict.fromkeys(texts) if t not in self._cache]

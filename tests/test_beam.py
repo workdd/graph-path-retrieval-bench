@@ -1,5 +1,6 @@
 import sys
 
+import numpy as np
 import pytest
 
 import relpath_bench.retrievers  # noqa: F401  (registers retrievers)
@@ -74,3 +75,24 @@ def test_score_is_mean_of_relation_similarities():
     g, res = _run(triples, table, "s", width=3)
     (p,) = [p for p in res.paths if p.length == 2]
     assert p.score == pytest.approx((0.7071067811865 + 0.0) / 2)
+
+
+def test_sentence_transformer_pickles_by_name(monkeypatch):
+    import pickle
+    import types
+
+    class FakeModel:
+        def __init__(self, name):
+            self.name = name
+            self.lock = lambda: None  # unpicklable, like a torch model
+
+        def encode(self, texts):
+            return np.array([[1.0, 0.0]] * len(texts))
+
+    fake = types.SimpleNamespace(SentenceTransformer=FakeModel)
+    monkeypatch.setitem(sys.modules, "sentence_transformers", fake)
+    emb = SentenceTransformerEmbedder("m")
+    emb.encode(["a"])
+    clone = pickle.loads(pickle.dumps(emb))
+    assert clone._name == "m" and clone._cache == {}
+    assert np.allclose(clone.encode(["b"]), [[1.0, 0.0]])
