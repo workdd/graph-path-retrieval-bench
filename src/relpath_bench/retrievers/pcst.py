@@ -44,6 +44,38 @@ from relpath_bench.registry import register
 from relpath_bench.types import Limits, Query, RetrievalResult, ScoredPath
 
 
+_SOLVER_VERIFIED = False
+
+
+def _verify_solver() -> None:
+    """Run a known case once per process; fail loudly on a broken binary."""
+    global _SOLVER_VERIFIED
+    if _SOLVER_VERIFIED:
+        return
+    from pcst_fast import pcst_fast
+
+    vertices, edges = pcst_fast(
+        np.array([[0, 1], [1, 2]], dtype=np.int64),
+        np.array([2.0, 1.0, 4.0]),
+        np.array([1.0, 1.0]),
+        -1,
+        1,
+        "gw",
+        0,
+    )
+    if sorted(np.asarray(vertices).tolist()) != [0, 1, 2] or sorted(
+        np.asarray(edges).tolist()
+    ) != [0, 1]:
+        raise RuntimeError(
+            "The installed pcst_fast binary is broken (known issue with the prebuilt "
+            "manylinux wheel under numpy 2: a known case returned vertices "
+            f"{np.asarray(vertices).tolist()}, edges {np.asarray(edges).tolist()} "
+            "instead of [0, 1, 2], [1, 0]). Fix: "
+            "pip install --force-reinstall --no-binary pcst_fast pcst_fast"
+        )
+    _SOLVER_VERIFIED = True
+
+
 @register
 class PcstRetriever:
     name = "pcst"
@@ -63,6 +95,7 @@ class PcstRetriever:
             return RetrievalResult([], False)
         from pcst_fast import pcst_fast
 
+        _verify_solver()
         seeds = tuple(dict.fromkeys(q.seeds))
         tree, capped = bfs_tree(g, seeds, limits.max_hops, limits.max_expanded)
         nodes = sorted(tree)

@@ -96,3 +96,28 @@ def test_pcst_seed_prize_keeps_seed_in_tree():
         "pcst", embedder=FixedEmbedder({}), top_nodes=2, edge_cost=1.0
     ).retrieve(g, q, 20, Limits())
     assert {g.node_names[p.end] for p in res.paths} == {"m", "a"}
+
+
+def test_pcst_selfcheck_rejects_broken_binary(monkeypatch, movie_graph, pacino_query):
+    import numpy as np
+    import pcst_fast
+
+    from relpath_bench.retrievers import pcst as pcst_mod
+
+    monkeypatch.setattr(pcst_mod, "_SOLVER_VERIFIED", False)
+    monkeypatch.setattr(
+        pcst_fast,
+        "pcst_fast",
+        lambda *a, **k: (np.array([0, 0, 0]), np.array([1, 1])),
+    )
+    r = registry.make("pcst", embedder=FixedEmbedder(_movie_table()), top_nodes=2)
+    with pytest.raises(RuntimeError, match="--no-binary pcst_fast"):
+        r.retrieve(movie_graph, pacino_query, 20, Limits())
+
+
+def test_pcst_selfcheck_passes_and_caches(monkeypatch):
+    from relpath_bench.retrievers import pcst as pcst_mod
+
+    monkeypatch.setattr(pcst_mod, "_SOLVER_VERIFIED", False)
+    pcst_mod._verify_solver()
+    assert pcst_mod._SOLVER_VERIFIED is True
