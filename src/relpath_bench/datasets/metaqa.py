@@ -6,6 +6,12 @@ stated in the dataset README.
 
 Files: ``kb.txt`` (``head|relation|tail``) and ``{1,2,3}-hop/vanilla/qa_{split}.txt``
 (``question with [Entity]<TAB>answer1|answer2``).
+
+Fallback source: the Google Drive folder is often unreachable (HTTP 401 for
+anonymous folder listing), so a Hugging Face mirror carrying the same vanilla files
+(``camazlucas/MetaQA``, ``kb/kb.txt`` instead of ``kb.txt``) is tried when the
+download fails. Its ``kb.txt`` is byte-identical to an independent GitHub copy and
+its question counts equal the original README table.
 """
 
 from __future__ import annotations
@@ -18,6 +24,7 @@ from relpath_bench.graph import build_graph
 from relpath_bench.types import Query
 
 FOLDER_URL = "https://drive.google.com/drive/folders/0B-36Uca2AvwhTWVFSUZqRXVtbUE"
+MIRROR_REPO = "camazlucas/MetaQA"
 HOPS = (1, 2, 3)
 _SPLIT_NAMES = {"train": ["train"], "test": ["test"], "validation": ["dev", "valid"]}
 
@@ -36,8 +43,14 @@ def _candidates(root: Path, hop: int, split: str) -> list[Path]:
     return [root / f"{hop}-hop" / "vanilla" / f"qa_{n}.txt" for n in names]
 
 
+def _kb_path(root: Path) -> Path:
+    """``kb.txt`` at the root (original release) or ``kb/kb.txt`` (Hugging Face mirror)."""
+    nested = root / "kb" / "kb.txt"
+    return nested if nested.exists() and not (root / "kb.txt").exists() else root / "kb.txt"
+
+
 def _missing(root: Path, split: str) -> list[Path]:
-    needed = [root / "kb.txt"] + [_qa_path(root, h, split) for h in HOPS]
+    needed = [_kb_path(root)] + [_qa_path(root, h, split) for h in HOPS]
     return [p for p in needed if not p.exists()]
 
 
@@ -55,6 +68,12 @@ def _not_found(root: Path, split: str) -> FileNotFoundError:
     )
 
 
+def _download_mirror(root: Path) -> None:
+    from huggingface_hub import snapshot_download  # lazy
+
+    snapshot_download(MIRROR_REPO, repo_type="dataset", local_dir=str(root))
+
+
 def _ensure(root: Path, split: str) -> None:
     if not _missing(root, split):
         return
@@ -66,6 +85,12 @@ def _ensure(root: Path, split: str) -> None:
         gdown.download_folder(url=FOLDER_URL, output=str(root), quiet=True)
     except Exception as exc:  # noqa: BLE001
         cause = exc
+    if _missing(root, split):
+        try:
+            root.mkdir(parents=True, exist_ok=True)
+            _download_mirror(root)
+        except Exception as exc:  # noqa: BLE001
+            cause = cause or exc
     if _missing(root, split):
         raise _not_found(root, split) from cause
 
@@ -91,11 +116,11 @@ def load_metaqa(
     root = data_dir if data_dir is not None else data_root() / "metaqa"
     if data_dir is None:
         _ensure(root, split)
-    elif not (root / "kb.txt").exists() or all(
+    elif not _kb_path(root).exists() or all(
         not _qa_path(root, h, split).exists() for h in HOPS
     ):
         raise _not_found(root, split)
-    g = build_graph(_read_triples(root / "kb.txt", stats))
+    g = build_graph(_read_triples(_kb_path(root), stats))
     for hop in HOPS:
         path = _qa_path(root, hop, split)
         if not path.exists():

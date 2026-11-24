@@ -12,6 +12,14 @@ from relpath_bench.datasets.common import data_root, sample_indices
 from data import MOVIE_TRIPLES
 
 
+@pytest.fixture(autouse=True)
+def _no_mirror_network(monkeypatch):
+    def boom(root):
+        raise OSError("mirror disabled in tests")
+
+    monkeypatch.setattr(metaqa_mod, "_download_mirror", boom, raising=False)
+
+
 def _write_metaqa(root: Path, qa: dict[int, str], split_file: str = "qa_test.txt") -> None:
     (root / "kb.txt").write_text("\n".join(f"{h}|{r}|{t}" for h, r, t in MOVIE_TRIPLES))
     for hop in (1, 2, 3):
@@ -229,3 +237,32 @@ def test_metaqa_error_lists_split_candidates_and_chains(tmp_path, monkeypatch):
         list(load("metaqa", "validation", None))
     assert "qa_dev.txt" in str(e.value) and "qa_valid.txt" in str(e.value)
     assert e.value.__cause__ is boom
+
+
+def test_metaqa_mirror_fallback_layout(tmp_path, monkeypatch):
+    """Drive fails; the mirror ships kb/kb.txt instead of kb.txt."""
+    monkeypatch.setenv("RELPATH_BENCH_DATA", str(tmp_path))
+    monkeypatch.setitem(
+        sys.modules,
+        "gdown",
+        types.SimpleNamespace(download_folder=lambda **kw: (_ for _ in ()).throw(OSError("401"))),
+    )
+    called = []
+
+    def mirror(root):
+        called.append(root)
+        _write_metaqa(root, {1: "who directed [Heat]\tMichael Mann\n"})
+        (root / "kb").mkdir()
+        (root / "kb.txt").rename(root / "kb" / "kb.txt")
+
+    monkeypatch.setattr(metaqa_mod, "_download_mirror", mirror, raising=False)
+    [ex] = list(load("metaqa", "test", None))
+    assert called == [tmp_path / "metaqa"]
+    assert ex.query.seeds and ex.query.answers
+
+
+def test_metaqa_kb_in_subfolder_with_data_dir(tmp_path):
+    _write_metaqa(tmp_path, {1: "who directed [Heat]\tMichael Mann\n"})
+    (tmp_path / "kb").mkdir()
+    (tmp_path / "kb.txt").rename(tmp_path / "kb" / "kb.txt")
+    assert len(list(load("metaqa", "test", None, data_dir=tmp_path))) == 1
