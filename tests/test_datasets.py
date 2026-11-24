@@ -12,6 +12,9 @@ from relpath_bench.datasets.common import data_root, sample_indices
 from data import MOVIE_TRIPLES
 
 
+_REAL_DOWNLOAD_MIRROR = metaqa_mod._download_mirror
+
+
 @pytest.fixture(autouse=True)
 def _no_mirror_network(monkeypatch):
     def boom(root):
@@ -266,3 +269,18 @@ def test_metaqa_kb_in_subfolder_with_data_dir(tmp_path):
     (tmp_path / "kb").mkdir()
     (tmp_path / "kb.txt").rename(tmp_path / "kb" / "kb.txt")
     assert len(list(load("metaqa", "test", None, data_dir=tmp_path))) == 1
+
+
+def test_metaqa_mirror_pinned_revision(tmp_path, monkeypatch):
+    got = {}
+
+    def fake(repo, **kw):
+        got["repo"], got["kw"] = repo, kw
+
+    monkeypatch.setitem(
+        sys.modules, "huggingface_hub", types.SimpleNamespace(snapshot_download=fake)
+    )
+    _REAL_DOWNLOAD_MIRROR(tmp_path)
+    assert got["repo"] == "camazlucas/MetaQA"
+    assert got["kw"]["revision"] == "f83854092893610686ab19f2038c039afa9bc643"
+    assert got["kw"]["revision"] == metaqa_mod.MIRROR_REVISION

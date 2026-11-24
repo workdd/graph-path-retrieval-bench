@@ -25,6 +25,7 @@ from relpath_bench.types import Query
 
 FOLDER_URL = "https://drive.google.com/drive/folders/0B-36Uca2AvwhTWVFSUZqRXVtbUE"
 MIRROR_REPO = "camazlucas/MetaQA"
+MIRROR_REVISION = "f83854092893610686ab19f2038c039afa9bc643"
 HOPS = (1, 2, 3)
 _SPLIT_NAMES = {"train": ["train"], "test": ["test"], "validation": ["dev", "valid"]}
 
@@ -71,7 +72,9 @@ def _not_found(root: Path, split: str) -> FileNotFoundError:
 def _download_mirror(root: Path) -> None:
     from huggingface_hub import snapshot_download  # lazy
 
-    snapshot_download(MIRROR_REPO, repo_type="dataset", local_dir=str(root))
+    snapshot_download(
+        MIRROR_REPO, repo_type="dataset", revision=MIRROR_REVISION, local_dir=str(root)
+    )
 
 
 def _ensure(root: Path, split: str) -> None:
